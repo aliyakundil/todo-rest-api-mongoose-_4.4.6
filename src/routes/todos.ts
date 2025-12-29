@@ -1,5 +1,5 @@
 import { Router } from "express";
-import * as todoController from "../controllers/todoController.js";
+import * as todoController from "@/controllers/todoController.js";
 import {
   validateAndHandle,
   validateCreateTodo,

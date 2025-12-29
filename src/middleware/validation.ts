@@ -7,19 +7,19 @@ export function validateCreateTodo(
 ) {
   const { text, priority } = req.body;
 
-  const errors = [];
+  const errors: string[] = [];
 
-  if (text !== undefined)
-    if (!text || typeof text !== "string")
-      errors.push("text is required and must be string");
-  if (priority !== undefined)
-    if (priority && !["low", "medium", "high"].includes(priority))
-      errors.push("priority must be low, medium, or high");
+  if (!text || typeof text !== "string") {
+    errors.push("text is required and must be string");
+  }
+
+  if (priority && !["low", "medium", "high"].includes(priority))
+    errors.push("priority must be low, medium, or high");
 
   if (errors.length > 0)
     return res
       .status(400)
-      .json({ success: false, error: "Validation failed", detailes: errors });
+      .json({ success: false, error: "Validation failed", details: errors });
 
   next();
 }
@@ -31,27 +31,27 @@ export function validateUpdateTodo(
 ) {
   const { text, completed, priority } = req.body;
 
-  const errors = [];
+  const errors: string[] = [];
 
   if (text !== undefined)
-    if (!text || typeof text !== "string")
+    if (typeof text !== "string" || text.trim() === "")
       errors.push("text is required and must be string");
+
   if (completed !== undefined)
     if (
-      !completed &&
       typeof completed !== "boolean" &&
       completed !== "true" &&
       completed !== "false"
     )
       errors.push("completed is required and must be boolean");
-  if (priority !== undefined)
-    if (priority && !["low", "medium", "high"].includes(priority))
+
+  if (priority !== undefined &&priority && !["low", "medium", "high"].includes(priority))
       errors.push("priority must be low, medium, or high");
 
   if (errors.length > 0)
     return res
       .status(400)
-      .json({ success: false, error: "Validation failed", detailes: errors });
+      .json({ success: false, error: "Validation failed", details: errors });
 
   next();
 }
@@ -61,18 +61,20 @@ export function validateTodoId(
   res: Response,
   next: NextFunction,
 ) {
-  const { id } = req.body;
+  const id = req.body.id ?? req.params.id;
 
-  const errors = [];
+  const errors: string[] = [];
 
-  if (id !== undefined)
-    if (!id || typeof id !== "number")
-      errors.push("id is required and must be number");
+  if (id === undefined) {
+    errors.push("id is required");
+  } else if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
+    errors.push("id must be a positive integer");
+  }
 
   if (errors.length > 0)
     return res
       .status(400)
-      .json({ success: false, error: "Validation failed", detailes: errors });
+      .json({ success: false, error: "Validation failed", details: errors });
 
   next();
 }

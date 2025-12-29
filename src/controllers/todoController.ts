@@ -1,12 +1,12 @@
-import type { Request, Response } from "express";
-import * as todoService from "../services/todoService";
+import type { NextFunction, Request, Response } from "express";
+import * as todoService from "@/services/todoService";
 import type {
   CreateTodoInput,
   UpdateTodoInput,
   PaginationQuery,
   ApiResponse,
   Todo,
-} from "../types/todo.types";
+} from "@/types/todo.types";
 
 export function getTodos(
   req: Request<{}, {}, {}, PaginationQuery>,
@@ -17,7 +17,7 @@ export function getTodos(
   res.json({
     success: true,
     data: {
-      todos: result.todo,
+      todos: result.todos,
       meta: result.meta,
     },
   });
@@ -76,43 +76,57 @@ export function updateTodo(
 }
 
 export function patchTodo(
-  req: Request<{ id: string }, {}, UpdateTodoInput>,
+  req: Request<{ id: string }, {}, Partial<UpdateTodoInput>>,
   res: Response<ApiResponse<Todo>>,
+  next: NextFunction
 ) {
-  const id = Number(req.params.id);
-  const updated = todoService.updateTodo(id, req.body);
+  try {
+    const id = Number(req.params.id);
 
-  if (!updated) {
-    return res.status(404).json({
-      success: false,
-      error: "Todo not found",
+    const body = req.body;
+
+    if(!body || Object.keys(body).length === 0) {
+      const err = new Error("Body не может быть пустым");
+      (err as any).status = 400;
+      return next(err)
+    }
+
+    const updated = todoService.patchTodo(id, req.body);
+
+    if (!updated) {
+      const err = new Error('Not Found');
+      (err as any).status = 400;
+      return next(err);
+    }
+
+    res.json({
+      success: true,
+      data: updated,
     });
+  } catch(error) {
+    next(error);
   }
-
-  res.json({
-    success: true,
-    data: updated,
-  });
 }
 
 export function deleteTodo(
   req: Request<{ id: string }>,
   res: Response<ApiResponse<null>>,
+  next: NextFunction
 ) {
-  const id = Number(req.params.id);
-  const deleted = todoService.deleteTodo(id);
+  try {
+    const id = Number(req.params.id);
+    const deleted = todoService.deleteTodo(id);
 
-  if (!deleted) {
-    return res.status(404).json({
-      success: false,
-      error: "Todo not found",
-    });
+    if (!deleted) {
+      const err = new Error("Todo not found");
+      (err as any).status = 404;
+      return next(err);
+    }
+
+    return res.status(404).send;
+  } catch(error) {
+    next(error);
   }
-
-  res.json({
-    success: true,
-    data: null,
-  });
 }
 
 export function getStats(_req: Request, res: Response<ApiResponse<any>>) {

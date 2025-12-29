@@ -11,6 +11,16 @@
     "target": "ES2020",
     "types": [],
     "esModuleInterop": true,
+    "baseUrl": "./src",
+    "ignoreDeprecations": "6.0",
+    "paths": {
+      "@/*": ["*"],
+      "@/types/*": ["types/*"],
+      "@/controllers/*": ["controllers/*"],
+      "@/services/*": ["services/*"],
+      "@/middleware/*": ["middleware/*"],
+      "@/routes/*": ["routes/*"]
+    },
     // For nodejs:
     // "lib": ["esnext"],
     // "types": ["node"],

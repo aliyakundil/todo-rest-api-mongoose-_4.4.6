@@ -2,9 +2,8 @@ import type {
   Todo,
   CreateTodoInput,
   UpdateTodoInput,
-  PaginationQuery,
-  ApiResponse,
-} from "../types/todo.types";
+  PaginationQuery
+} from "@/types/todo.types";
 
 export let nextId = 1;
 
@@ -17,7 +16,7 @@ export let todos: Todo[] = [
     createdAt: new Date("2024-01-01"),
   },
   {
-    id: nextId++,
+    id: nextId++, 
     text: "Build API",
     completed: true,
     priority: "medium",
@@ -37,6 +36,7 @@ export const getTodosData = () => todos;
 export function getTodos(options: PaginationQuery) {
   const page = options.page ? parseInt(options.page) : 1;
   const limit = options.limit ? parseInt(options.limit) : 10;
+  const offset = (page - 1) * limit;
 
   let completedFilter: boolean | undefined;
 
@@ -44,7 +44,7 @@ export function getTodos(options: PaginationQuery) {
     completedFilter = options.completed === "true";
   }
 
-  let todo = todos.filter((item) => {
+  let todosFilter = todos.filter((item) => {
     if (completedFilter !== undefined)
       if (item.completed !== completedFilter) return false;
     if (options.priority !== undefined)
@@ -54,17 +54,18 @@ export function getTodos(options: PaginationQuery) {
       if (!item.text.toLowerCase().includes(options.search.toLowerCase()))
         return false;
     }
-
     return true;
   });
 
+  const paginated = todosFilter.slice(offset, offset + limit);
+
   return {
-    todo,
+    todos: paginated,
     meta: {
-      total: todo.length,
+      total: todosFilter.length,
       page: page,
       limit: limit,
-      totalPage: Math.ceil(todo.length / limit),
+      totalPage: Math.ceil(todosFilter.length / limit),
     },
   };
 }
@@ -74,6 +75,7 @@ export function getTodoById(id: number): Todo | null {
 }
 
 export function createTodo(input: CreateTodoInput): Todo {
+  if (!input.text || input.text.trim() === "") throw new Error ("Todo text is required")
   const newTodo = {
     id: nextId++,
     text: input.text.trim(),
@@ -102,28 +104,28 @@ export function updateTodo(id: number, input: UpdateTodoInput): Todo | null {
   return todoUpdate;
 }
 
-export function patchTodo(id: number, input: UpdateTodoInput): Todo | null {
-  const todoUpdate = todos.find((todo) => todo.id === id);
+export function patchTodo(id: number, input: Partial<UpdateTodoInput>): Todo | null {
+  const todoPatch = todos.find((todo) => todo.id === id);
 
-  if (!todoUpdate) return null;
+  if (!todoPatch) return null;
 
-  if (input.text !== undefined) todoUpdate.text = input.text.trim();
+  if (input.text !== undefined) todoPatch.text = input.text.trim();
   if (input.completed !== undefined)
-    todoUpdate.completed =
+    todoPatch.completed =
       typeof input.completed === "string"
         ? input.completed === "true"
         : input.completed;
-  if (input.priority !== undefined) todoUpdate.priority = input.priority;
-  todoUpdate.updatedAt = new Date();
+  if (input.priority !== undefined) todoPatch.priority = input.priority;
+  todoPatch.updatedAt = new Date();
 
-  return todoUpdate;
+  return todoPatch;
 }
 
 export function deleteTodo(id: number): boolean {
-  if (!id) return false;
-
   const todoDelete = todos.findIndex((todo) => todo.id === id);
 
+  if (todoDelete === -1) return false;
+    
   todos.splice(todoDelete, 1);
 
   return true;
@@ -143,22 +145,24 @@ export function getStats() {
 }
 
 // Пример вызова
-createTodo({
-  text: "Alia",
-  completed: false,
-  priority: "low",
-});
-console.log(
-  getTodos({
-    page: "1",
-    limit: "10",
-    completed: "true",
-    priority: "medium",
-    search: "API",
-  }),
-);
-updateTodo(4, { text: "Alia Kundil" });
-console.log(getTodoById(4));
-deleteTodo(4);
-console.log(getTodoById(4));
-console.log(getStats());
+export function demoCode() {
+  createTodo({
+    text: "Alia",
+    completed: false,
+    priority: "low",
+  });
+  console.log(
+    getTodos({
+      page: "1",
+      limit: "10",
+      completed: "true",
+      priority: "medium",
+      search: "API",
+    }),
+  );
+  updateTodo(4, { text: "Alia Kundil" });
+  console.log(getTodoById(4));
+  deleteTodo(4);
+  console.log(getTodoById(4));
+  console.log(getStats());
+}

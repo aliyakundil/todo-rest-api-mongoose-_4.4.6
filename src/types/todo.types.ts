@@ -8,7 +8,7 @@ export interface Todo {
 }
 
 export interface CreateTodoInput {
-  text: string;
+  text?: string;
   priority?: "low" | "medium" | "high";
   completed?: string | boolean;
 }
