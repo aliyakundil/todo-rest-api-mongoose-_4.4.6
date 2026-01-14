@@ -67,9 +67,7 @@ export function validateTodoId(
 
   if (id === undefined) {
     errors.push("id is required");
-  } else if (!Number.isInteger(Number(id)) || Number(id) <= 0) {
-    errors.push("id must be a positive integer");
-  }
+  } 
 
   if (errors.length > 0)
     return res

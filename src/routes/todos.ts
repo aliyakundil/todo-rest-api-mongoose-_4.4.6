@@ -14,7 +14,7 @@ const router = Router();
 router.get(
   "/",
   validateAndHandle([validateTodoQuery]),
-  todoController.getTodos,
+  todoController.getTodosController,
 );
 
 // GET /api/todos/stats - Статистика (ВАЖНО: выше чем /:id)

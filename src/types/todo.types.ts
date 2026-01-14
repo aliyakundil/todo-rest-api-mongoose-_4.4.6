@@ -1,5 +1,7 @@
+import { ObjectId } from "mongodb";
+
 export interface Todo {
-  id: number;
+  _id?: ObjectId;
   text: string;
   completed: boolean;
   priority: "low" | "medium" | "high";

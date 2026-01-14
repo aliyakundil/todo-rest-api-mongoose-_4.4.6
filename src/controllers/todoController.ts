@@ -7,12 +7,13 @@ import type {
   ApiResponse,
   Todo,
 } from "@/types/todo.types";
+import { getTodos } from "@/services/todoService";
 
-export function getTodos(
+export async function getTodosController(
   req: Request<{}, {}, {}, PaginationQuery>,
   res: Response<ApiResponse<{ todos: Todo[]; meta: any }>>,
 ) {
-  const result = todoService.getTodos(req.query);
+  const result = await getTodos(req.query);
 
   res.json({
     success: true,
@@ -23,65 +24,95 @@ export function getTodos(
   });
 }
 
-export function getTodoById(
+export async function getTodoById(
   req: Request<{ id: string }>,
   res: Response<ApiResponse<Todo>>,
 ) {
-  const id = Number(req.params.id);
-  const todo = todoService.getTodoById(id);
+  try {
+    const id = req.params.id;
 
-  if (!todo) {
-    return res.status(404).json({
+    if (!id) {
+      return res.status(404).json({
+        success: false,
+        error: "Todo not found",
+      });
+    }
+
+    const todo = await todoService.getTodoById(id);
+
+    if (!todo) {
+      return res.status(404).json({
+        success: false,
+        error: "Invalid todo id",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: todo,
+    })
+  } catch(err: any) {
+    res.status(400).json({
       success: false,
-      error: "Todo not found",
+      error: err.message,
     });
   }
-
-  res.json({
-    success: true,
-    data: todo,
-  });
 }
 
-export function createTodo(
+export async function createTodo(
   req: Request<{}, {}, CreateTodoInput>,
   res: Response<ApiResponse<Todo>>,
 ) {
-  const todo = todoService.createTodo(req.body);
+  try {
+    const todo = await todoService.createTodo(req.body);
 
-  res.status(201).json({
-    success: true,
-    data: todo,
-  });
+    res.status(201).json({
+      success: true,
+      data: todo,
+    });
+  } catch(err: any) {
+    res.status(400).json({
+      success: false,
+      error: err.message,
+    })
+  }
+
 }
 
-export function updateTodo(
+export async function updateTodo(
   req: Request<{ id: string }, {}, UpdateTodoInput>,
   res: Response<ApiResponse<Todo>>,
 ) {
-  const id = Number(req.params.id);
-  const updated = todoService.updateTodo(id, req.body);
+  try {
+    const id = req.params.id;
+    const updated = await todoService.updateTodo(id, req.body);
 
-  if (!updated) {
-    return res.status(404).json({
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        error: "Todo not found",
+      })
+    }
+
+    res.json({
+      success: true,
+      data: updated,
+    })
+  } catch(err: any) {
+    res.status(400).json({
       success: false,
-      error: "Todo not found",
-    });
+      error: err.message,
+    })
   }
-
-  res.json({
-    success: true,
-    data: updated,
-  });
 }
 
-export function patchTodo(
+export async function patchTodo(
   req: Request<{ id: string }, {}, Partial<UpdateTodoInput>>,
   res: Response<ApiResponse<Todo>>,
   next: NextFunction
 ) {
   try {
-    const id = Number(req.params.id);
+    const id = req.params.id;
 
     const body = req.body;
 
@@ -91,7 +122,7 @@ export function patchTodo(
       return next(err)
     }
 
-    const updated = todoService.patchTodo(id, req.body);
+    const updated = await todoService.patchTodo(id, req.body);
 
     if (!updated) {
       const err = new Error('Not Found');
@@ -108,14 +139,14 @@ export function patchTodo(
   }
 }
 
-export function deleteTodo(
+export async function deleteTodo(
   req: Request<{ id: string }>,
   res: Response<ApiResponse<null>>,
   next: NextFunction
 ) {
   try {
-    const id = Number(req.params.id);
-    const deleted = todoService.deleteTodo(id);
+    const id = req.params.id;
+    const deleted = await todoService.deleteTodo(id);
 
     if (!deleted) {
       const err = new Error("Todo not found");
@@ -123,14 +154,14 @@ export function deleteTodo(
       return next(err);
     }
 
-    return res.status(404).send;
+    return res.status(204).send();
   } catch(error) {
     next(error);
   }
 }
 
-export function getStats(_req: Request, res: Response<ApiResponse<any>>) {
-  const stats = todoService.getStats();
+export async function getStats(_req: Request, res: Response<ApiResponse<any>>) {
+  const stats = await todoService.getStats();
 
   res.json({
     success: true,

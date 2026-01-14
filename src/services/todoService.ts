@@ -1,3 +1,6 @@
+import { ObjectId } from "mongodb";
+import { getDb } from "../config/database";
+
 import type {
   Todo,
   CreateTodoInput,
@@ -5,38 +8,13 @@ import type {
   PaginationQuery
 } from "@/types/todo.types";
 
-export let nextId = 1;
-
-export let todos: Todo[] = [
-  {
-    id: nextId++,
-    text: "Learn TypeScript",
-    completed: false,
-    priority: "high",
-    createdAt: new Date("2024-01-01"),
-  },
-  {
-    id: nextId++, 
-    text: "Build API",
-    completed: true,
-    priority: "medium",
-    createdAt: new Date("2024-01-02"),
-  },
-  {
-    id: nextId++,
-    text: "Write tests",
-    completed: false,
-    priority: "low",
-    createdAt: new Date("2024-01-03"),
-  },
-];
-
-export const getTodosData = () => todos;
-
-export function getTodos(options: PaginationQuery) {
+export async function getTodos(options: PaginationQuery) {
+  const db = getDb();
   const page = options.page ? parseInt(options.page) : 1;
   const limit = options.limit ? parseInt(options.limit) : 10;
   const offset = (page - 1) * limit;
+
+  const filter: any = {};
 
   let completedFilter: boolean | undefined;
 
@@ -44,51 +22,66 @@ export function getTodos(options: PaginationQuery) {
     completedFilter = options.completed === "true";
   }
 
-  let todosFilter = todos.filter((item) => {
-    if (completedFilter !== undefined)
-      if (item.completed !== completedFilter) return false;
-    if (options.priority !== undefined)
-      if (item.priority !== options.priority) return false;
+  if (options.completed !== undefined) {
+    filter.completed = options.completed === "true";
+  }
 
-    if (options.search) {
-      if (!item.text.toLowerCase().includes(options.search.toLowerCase()))
-        return false;
-    }
-    return true;
-  });
+  if (options.priority !== undefined) {
+    filter.priority = options.priority;
+  }
 
-  const paginated = todosFilter.slice(offset, offset + limit);
+  if (options.search) {
+    if (!filter.text.toLowerCase().includes(options.search.toLowerCase()))
+      filter.text = { $regex: options.search, $options: "i" };
+  }
+
+  const todos = await db.collection('todos')
+    .find(filter)
+    .skip(offset)
+    .limit(limit)
+    .toArray() as Todo[];
+
+  const total = await db.collection<Todo>("todos").countDocuments(filter);
+
 
   return {
-    todos: paginated,
+    todos: todos,
     meta: {
-      total: todosFilter.length,
+      total: total,
       page: page,
       limit: limit,
-      totalPage: Math.ceil(todosFilter.length / limit),
+      totalPage: Math.ceil(total/ limit),
     },
   };
 }
 
-export function getTodoById(id: number): Todo | null {
-  return todos.find((todo) => todo.id === id) ?? null;
+export async function getTodoById(id: string): Promise<Todo | null> {
+  const db = getDb();
+  if (!ObjectId.isValid(id)) return null;
+  const todo = await db.collection<Todo>('todos').findOne({ _id : new ObjectId(id)}) as Todo;
+  return todo;
 }
 
-export function createTodo(input: CreateTodoInput): Todo {
+export async function createTodo(input: CreateTodoInput): Promise<Todo> {
+  const db = getDb();
+
   if (!input.text || input.text.trim() === "") throw new Error ("Todo text is required")
-  const newTodo = {
-    id: nextId++,
+  const newTodo: Todo = {
     text: input.text.trim(),
     completed: input.completed === "true" || input.completed === true,
     priority: input.priority ?? "low",
     createdAt: new Date(),
-  };
-  todos.push(newTodo);
+  } as Todo;
+
+  const result = await db.collection<Todo>("todos").insertOne(newTodo)
+  newTodo._id = result.insertedId;
+
   return newTodo;
 }
 
-export function updateTodo(id: number, input: UpdateTodoInput): Todo | null {
-  const todoUpdate = todos.find((todo) => todo.id === id);
+export async function updateTodo(id: string, input: UpdateTodoInput): Promise<Todo | null> {
+  const db = getDb();
+  const todoUpdate = await db.collection<Todo>('todos').findOne({ _id : new ObjectId(id)});
 
   if (!todoUpdate) return null;
 
@@ -101,11 +94,14 @@ export function updateTodo(id: number, input: UpdateTodoInput): Todo | null {
   if (input.priority !== undefined) todoUpdate.priority = input.priority;
   todoUpdate.updatedAt = new Date();
 
+  db.collection<Todo>('todos').updateOne({}, {$set: todoUpdate})
+
   return todoUpdate;
 }
 
-export function patchTodo(id: number, input: Partial<UpdateTodoInput>): Todo | null {
-  const todoPatch = todos.find((todo) => todo.id === id);
+export async function patchTodo(id: string, input: Partial<UpdateTodoInput>): Promise<Todo | null> {
+  const db = getDb();
+  const todoPatch = await db.collection<Todo>('todos').findOne({ _id : new ObjectId(id)});
 
   if (!todoPatch) return null;
 
@@ -118,51 +114,37 @@ export function patchTodo(id: number, input: Partial<UpdateTodoInput>): Todo | n
   if (input.priority !== undefined) todoPatch.priority = input.priority;
   todoPatch.updatedAt = new Date();
 
-  return todoPatch;
+  db.collection<UpdateTodoInput>("todos").findOneAndUpdate(
+      { _id: new ObjectId(id) },
+      { $set: todoPatch },
+      { returnDocument: "after" } 
+  )
+
+  return todoPatch ?? null;
 }
 
-export function deleteTodo(id: number): boolean {
-  const todoDelete = todos.findIndex((todo) => todo.id === id);
-
-  if (todoDelete === -1) return false;
-    
-  todos.splice(todoDelete, 1);
-
-  return true;
+export async function deleteTodo(id: string): Promise<boolean> {
+  const db = getDb();
+  const result = await db.collection<Todo>('todos').deleteOne({ _id : new ObjectId(id)});
+  return result.deletedCount === 1;
 }
 
-export function getStats() {
+export async function getStats() {
+  const db = getDb();
+  const total = await db.collection<Todo>("todos").find().count();
+  const completed = await db.collection<Todo>('todos').find({"completed": true}).count();
+  const pending = await db.collection<Todo>('todos').find({"completed": false}).count();
+  const low = await db.collection<Todo>('todos').find({"priority": "low"}).count();
+  const medium = await db.collection<Todo>('todos').find({"priority": "medium"}).count();
+  const high = await db.collection<Todo>('todos').find({"priority": "high"}).count();
   return {
-    total: todos.length,
-    completed: todos.filter((todo) => todo.completed === true).length,
-    pending: todos.filter((todo) => todo.completed === false).length,
+    total: total,
+    completed: completed,
+    pending: pending,
     byPriority: {
-      low: todos.filter((todo) => todo.priority === "low").length,
-      medium: todos.filter((todo) => todo.priority === "medium").length,
-      high: todos.filter((todo) => todo.priority === "high").length,
+      low: low,
+      medium: medium,
+      high: high,
     },
   };
-}
-
-// Пример вызова
-export function demoCode() {
-  createTodo({
-    text: "Alia",
-    completed: false,
-    priority: "low",
-  });
-  console.log(
-    getTodos({
-      page: "1",
-      limit: "10",
-      completed: "true",
-      priority: "medium",
-      search: "API",
-    }),
-  );
-  updateTodo(4, { text: "Alia Kundil" });
-  console.log(getTodoById(4));
-  deleteTodo(4);
-  console.log(getTodoById(4));
-  console.log(getStats());
 }

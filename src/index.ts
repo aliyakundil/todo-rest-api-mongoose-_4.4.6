@@ -4,9 +4,12 @@ import helmet from "helmet";
 import morgan from "morgan";
 import routes from "./routes/index";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
+import { connectToDb, getDb } from './config/database';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+
+let db: unknown;
 
 app.use(helmet());
 app.use(cors());
@@ -27,12 +30,25 @@ app.get("/", (_req, res) => {
   });
 });
 
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'OK',
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 // Обработка неизвестных маршрутов
 app.use(notFoundHandler);
 
 // Глобальный обработчик ошибок
 app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log("Server started on port 3000");
-});
+connectToDb((err?: Error) => {
+  if(!err) {
+    app.listen(PORT, () => {
+      console.log("Server started on port 3000");
+    });
+    db = getDb();
+  }
+})
