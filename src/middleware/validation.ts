@@ -61,7 +61,7 @@ export function validateTodoId(
   res: Response,
   next: NextFunction,
 ) {
-  const id = req.body.id ?? req.params.id;
+  const id = req.params.id;
 
   const errors: string[] = [];
 
