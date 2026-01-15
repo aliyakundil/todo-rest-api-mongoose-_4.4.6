@@ -5,6 +5,7 @@ import morgan from "morgan";
 import routes from "./routes/index";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
 import { connectToDb, getDb } from './config/database';
+import { getDbStatus } from './config/database';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -24,31 +25,51 @@ app.get("/", (_req, res) => {
     version: "1.0.0",
     links: {
       api: "/api",
-      health: "/api/health",
+      health: "/health",
       todos: "/api/todos",
     },
   });
 });
 
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'OK',
+app.get('/health', async (req, res) => {
+  try {
+    const db = getDb();
+
+    await db.command({ ping: 1})
+
+    res.json({
+    ...getDbStatus(),
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
   });
+  } catch (err) {
+    res.status(503).json({
+      ...getDbStatus(),
+      db: "disconnected",
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development'
+    })
+  }
 });
+
+async function startServer() {
+  try {
+    await connectToDb();
+
+    app.listen(PORT, () => {
+      console.log("Server started on port 3000");
+    });
+
+  } catch(err) {
+    console.log("Failed to start server: ", err)
+    process.exit(1);
+  }
+}
+
+startServer();
 
 // Обработка неизвестных маршрутов
 app.use(notFoundHandler);
 
 // Глобальный обработчик ошибок
 app.use(errorHandler);
-
-connectToDb((err?: Error) => {
-  if(!err) {
-    app.listen(PORT, () => {
-      console.log("Server started on port 3000");
-    });
-    db = getDb();
-  }
-})
