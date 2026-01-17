@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { getDb } from "../config/database";
+import mongoose, { Model } from "mongoose";
 
 import type {
   Todo,
@@ -8,8 +8,36 @@ import type {
   PaginationQuery
 } from "@/types/todo.types";
 
+export interface ITodoDocument extends Document {
+  text: string;
+  completed: boolean;
+  priority: "low" | "medium" | "high";
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const todoSchema = new mongoose.Schema(
+  {
+    text: {
+      type: String,
+      required: true
+    },
+    completed: Boolean,
+    priority: {
+      type: String,
+      enum: ["low", "medium", "high"],
+      default: "low"
+    },
+  },
+  { timestamps: true }
+);
+
+todoSchema.index({ createdAt: -1 });
+todoSchema.index({ completed: 1 });
+
+export const ITodo: Model<ITodoDocument> = mongoose.model<ITodoDocument>("Todo", todoSchema);
+
 export async function getTodos(options: PaginationQuery) {
-  const db = getDb();
   const page = options.page ? parseInt(options.page) : 1;
   const limit = options.limit ? parseInt(options.limit) : 10;
   const offset = (page - 1) * limit;
@@ -35,13 +63,13 @@ export async function getTodos(options: PaginationQuery) {
       filter.text = { $regex: options.search, $options: "i" };
   }
 
-  const todos = await db.collection('todos')
+  const todos = await ITodo
     .find(filter)
+    .sort({ crearedAt: -1 })
     .skip(offset)
-    .limit(limit)
-    .toArray() as Todo[];
+    .limit(limit);
 
-  const total = await db.collection<Todo>("todos").countDocuments(filter);
+  const total = await ITodo.countDocuments(filter);
 
 
   return {
@@ -56,32 +84,30 @@ export async function getTodos(options: PaginationQuery) {
 }
 
 export async function getTodoById(id: string): Promise<Todo | null> {
-  const db = getDb();
-  if (!ObjectId.isValid(id)) return null;
-  const todo = await db.collection<Todo>('todos').findOne({ _id : new ObjectId(id)}) as Todo;
-  return todo;
+  try {
+    const todo = await ITodo.findById(id);
+    return todo;
+  } catch (err) {
+    return null
+  }
 }
 
 export async function createTodo(input: CreateTodoInput): Promise<Todo> {
-  const db = getDb();
 
   if (!input.text || input.text.trim() === "") throw new Error ("Todo text is required")
-  const newTodo: Todo = {
+  const newTodo = new ITodo({
     text: input.text.trim(),
     completed: input.completed === "true" || input.completed === true,
-    priority: input.priority ?? "low",
-    createdAt: new Date(),
-  } as Todo;
+    priority: input.priority ?? "low"
+  });
 
-  const result = await db.collection<Todo>("todos").insertOne(newTodo)
-  newTodo._id = result.insertedId;
+  await newTodo.save();
 
   return newTodo;
 }
 
 export async function updateTodo(id: string, input: UpdateTodoInput): Promise<Todo | null> {
-  const db = getDb();
-  const todoUpdate = await db.collection<Todo>('todos').findOne({ _id : new ObjectId(id)});
+  const todoUpdate = await ITodo.findOne({ _id : new ObjectId(id)});
 
   if (!todoUpdate) return null;
 
@@ -94,14 +120,13 @@ export async function updateTodo(id: string, input: UpdateTodoInput): Promise<To
   if (input.priority !== undefined) todoUpdate.priority = input.priority;
   todoUpdate.updatedAt = new Date();
 
-  db.collection<Todo>('todos').updateOne({}, {$set: todoUpdate})
+  await todoUpdate.save();
 
   return todoUpdate;
 }
 
 export async function patchTodo(id: string, input: Partial<UpdateTodoInput>): Promise<Todo | null> {
-  const db = getDb();
-  const todoPatch = await db.collection<Todo>('todos').findOne({ _id : new ObjectId(id)});
+  const todoPatch = await ITodo.findOne({ _id : new ObjectId(id)});
 
   if (!todoPatch) return null;
 
@@ -114,29 +139,27 @@ export async function patchTodo(id: string, input: Partial<UpdateTodoInput>): Pr
   if (input.priority !== undefined) todoPatch.priority = input.priority;
   todoPatch.updatedAt = new Date();
 
-  db.collection<UpdateTodoInput>("todos").findOneAndUpdate(
+  const update = await ITodo.findOneAndUpdate(
       { _id: new ObjectId(id) },
       { $set: todoPatch },
       { returnDocument: "after" } 
   )
 
-  return todoPatch ?? null;
+  return update ?? null;
 }
 
 export async function deleteTodo(id: string): Promise<boolean> {
-  const db = getDb();
-  const result = await db.collection<Todo>('todos').deleteOne({ _id : new ObjectId(id)});
+  const result = await ITodo.deleteOne({ _id : new ObjectId(id)});
   return result.deletedCount === 1;
 }
 
 export async function getStats() {
-  const db = getDb();
-  const total = await db.collection<Todo>("todos").find().count();
-  const completed = await db.collection<Todo>('todos').find({"completed": true}).count();
-  const pending = await db.collection<Todo>('todos').find({"completed": false}).count();
-  const low = await db.collection<Todo>('todos').find({"priority": "low"}).count();
-  const medium = await db.collection<Todo>('todos').find({"priority": "medium"}).count();
-  const high = await db.collection<Todo>('todos').find({"priority": "high"}).count();
+  const total = await ITodo.find().countDocuments();
+  const completed = await ITodo.find({"completed": true}).countDocuments();
+  const pending = await ITodo.find({"completed": false}).countDocuments();
+  const low = await ITodo.find({"priority": "low"}).countDocuments();
+  const medium = await ITodo.find({"priority": "medium"}).countDocuments();
+  const high = await ITodo.find({"priority": "high"}).countDocuments();
   return {
     total: total,
     completed: completed,

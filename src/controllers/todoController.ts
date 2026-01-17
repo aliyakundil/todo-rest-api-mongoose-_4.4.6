@@ -15,7 +15,7 @@ export async function getTodosController(
 ) {
   const result = await getTodos(req.query);
 
-  res.json({
+  res.status(200).json({
     success: true,
     data: {
       todos: result.todos,

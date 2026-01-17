@@ -4,13 +4,11 @@ import helmet from "helmet";
 import morgan from "morgan";
 import routes from "./routes/index";
 import { errorHandler, notFoundHandler } from "./middleware/errorHandler.js";
-import { connectToDb, getDb } from './config/database';
-import { getDbStatus } from './config/database';
+import { connectToDb } from './config/database';
+import mongoose from "mongoose";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-
-let db: unknown;
 
 app.use(helmet());
 app.use(cors());
@@ -33,18 +31,22 @@ app.get("/", (_req, res) => {
 
 app.get('/health', async (req, res) => {
   try {
-    const db = getDb();
+    const state = mongoose.connection.readyState;
 
-    await db.command({ ping: 1})
+    const dbStatus =
+    state === 1
+      ? "connected"
+      : state === 2
+      ? "connecting"
+      : "disconnected";
 
     res.json({
-    ...getDbStatus(),
+    db: dbStatus,
     uptime: process.uptime(),
     environment: process.env.NODE_ENV || 'development'
   });
   } catch (err) {
     res.status(503).json({
-      ...getDbStatus(),
       db: "disconnected",
       uptime: process.uptime(),
       environment: process.env.NODE_ENV || 'development'
