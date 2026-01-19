@@ -59,13 +59,12 @@ export async function getTodos(options: PaginationQuery) {
   }
 
   if (options.search) {
-    if (!filter.text.toLowerCase().includes(options.search.toLowerCase()))
-      filter.text = { $regex: options.search, $options: "i" };
+    filter.text = { $regex: options.search, $options: "i" };
   }
 
   const todos = await ITodo
     .find(filter)
-    .sort({ crearedAt: -1 })
+    .sort({ createdAt: -1 })
     .skip(offset)
     .limit(limit);
 
