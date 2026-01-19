@@ -1,3 +1,4 @@
+import { Types } from "mongoose";
 import type { Request, Response, NextFunction, RequestHandler } from "express";
 
 export function validateCreateTodo(
@@ -65,9 +66,11 @@ export function validateTodoId(
 
   const errors: string[] = [];
 
-  if (id === undefined) {
+  if (!id) {
     errors.push("id is required");
-  } 
+  } else if (!Types.ObjectId.isValid(id)) {
+    errors.push("id must be a valid MongoDB ObjectId");
+  }
 
   if (errors.length > 0)
     return res

@@ -1,7 +1,9 @@
+import mongoose from "mongoose";
 import type { Request, Response, NextFunction } from "express";
 
 interface ApiError extends Error {
   status?: number;
+  code?: number;
 }
 
 export function errorHandler(
@@ -25,6 +27,49 @@ export function errorHandler(
     success: false,
     error: err.message,
   });
+
+  // (невалидный ObjectId)
+  if (err instanceof mongoose.Error.CastError) {
+    return res.status(400).json({
+      success: false,
+      error: "Invalid ID format",
+      message: `Route ${req.originalUrl} does not exist`,
+    })
+  }
+
+  // Mongoose ValidationError
+  if (err instanceof mongoose.Error.ValidationError) {
+    return res.status(400).json({
+      success: false,
+      error: "Validation error",
+      message: `Route ${req.originalUrl} does not exist`,
+    })
+  }
+
+  // Duplicate key
+  if (err.code === 11000) {
+    return res.status(409).json({
+      success: false,
+      error: "Duplicate key error",
+      message: `Route ${req.originalUrl} does not exist`,
+    })
+  };
+
+  // Mongo connection error
+  if (err.name === "MongooseServerSelectionError") {
+    return res.status(503).json({
+      success: false,
+      error: "Database unavailable",
+    });
+  };
+
+  // addКастомные ошибки
+  if (err.status) {
+    return res.status(err.status).json({
+      success: false,
+      error: err.message,
+    });
+  }
 }
 
 // Middleware для обработки несуществующих маршрутов
