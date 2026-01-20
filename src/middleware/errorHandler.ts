@@ -15,19 +15,6 @@ export function errorHandler(
   // статус по умолчанию
   const status = err.status || 500;
 
-  // Логирование ошибки
-  console.error("Error:", {
-    message: err.message,
-    status,
-    stack: err.stack,
-  });
-
-  // отправка json клиенту
-  res.status(status).json({
-    success: false,
-    error: err.message,
-  });
-
   // (невалидный ObjectId)
   if (err instanceof mongoose.Error.CastError) {
     return res.status(400).json({
@@ -70,6 +57,19 @@ export function errorHandler(
       error: err.message,
     });
   }
+
+    // Логирование ошибки
+  console.error("Error:", {
+    message: err.message,
+    status,
+    stack: err.stack,
+  });
+
+  // отправка json клиенту
+  res.status(status).json({
+    success: false,
+    error: err.message,
+  });
 }
 
 // Middleware для обработки несуществующих маршрутов
